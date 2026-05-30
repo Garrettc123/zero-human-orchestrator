@@ -1,0 +1,40 @@
+name: Orchestrator Smoke Test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 * * * *"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      ORCHESTRATOR_URL: ${{ secrets.ORCHESTRATOR_URL }}
+    steps:
+      - name: Health check root
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$ORCHESTRATOR_URL/")
+          echo "Root status: $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
+
+      - name: Health check docs
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$ORCHESTRATOR_URL/docs")
+          echo "Docs status: $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
+
+      - name: Check GENESIS score endpoint
+        run: |
+          RESP=$(curl -s "$ORCHESTRATOR_URL/genesis/score")
+          echo "GENESIS response: $RESP"
+          echo "$RESP" | grep -q "baseline" || exit 1
+
+      - name: Check systems endpoint
+        run: |
+          RESP=$(curl -s "$ORCHESTRATOR_URL/systems")
+          echo "Systems response: $RESP"
+          echo "$RESP" | grep -q "total" || exit 1
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "SMOKE TEST FAILED - Orchestrator may be down!"
